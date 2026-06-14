@@ -473,9 +473,18 @@ export function App() {
           </span>
           {actionMsg && <span className="cmd-msg">{actionMsg}</span>}
           <div className="cmd-sep" />
-          <button className="cmd-act" disabled={acting} onClick={() => runBulk("approve")}>
-            Approve
-          </button>
+          {/* Approve only makes sense for PRs you didn't author — GitHub blocks
+              self-approval. Show it only when the selection includes others'. */}
+          {prs.some(
+            (pr) =>
+              selected.has(prKey(pr)) &&
+              pr.author?.login &&
+              (!result?.viewerLogin || pr.author.login !== result.viewerLogin),
+          ) && (
+            <button className="cmd-act" disabled={acting} onClick={() => runBulk("approve")}>
+              Approve
+            </button>
+          )}
           <button className="cmd-act cmd-merge" disabled={acting} onClick={() => runBulk("merge")}>
             Merge
           </button>

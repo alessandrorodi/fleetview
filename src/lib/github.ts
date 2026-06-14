@@ -45,12 +45,15 @@ export interface FleetResult {
   pullRequests: PullRequest[];
   issueCount: number;
   rateLimit: RateLimit;
+  // Login of the authenticated user — used to tell "your" PRs from others'.
+  viewerLogin: string;
   // True when the maxPages cap was hit before all matching PRs were fetched.
   truncated: boolean;
 }
 
 const QUERY = `
 query Fleet($q: String!, $first: Int!, $after: String) {
+  viewer { login }
   rateLimit { remaining limit resetAt }
   search(query: $q, type: ISSUE, first: $first, after: $after) {
     issueCount
@@ -131,6 +134,7 @@ export async function fetchFleet(opts: {
   const pullRequests: PullRequest[] = [];
   let issueCount = 0;
   let rateLimit: RateLimit = { remaining: 0, limit: 0, resetAt: "" };
+  let viewerLogin = "";
   let after: string | null = null;
   let pages = 0;
   let truncated = false;
@@ -139,6 +143,7 @@ export async function fetchFleet(opts: {
     const data = await postPage({ ...opts, first: pageSize, after });
     const search = data.search;
     rateLimit = data.rateLimit;
+    viewerLogin = data.viewer?.login ?? "";
     issueCount = search.issueCount;
     // `type: ISSUE` returns issues too; the inline fragment leaves non-PR
     // nodes as empty objects, so keep only those that carried PR fields.
@@ -153,7 +158,7 @@ export async function fetchFleet(opts: {
     }
   } while (after);
 
-  return { pullRequests, issueCount, rateLimit, truncated };
+  return { pullRequests, issueCount, rateLimit, viewerLogin, truncated };
 }
 
 // --- Write actions ----------------------------------------------------------

@@ -126,6 +126,7 @@ export function demoResult(): FleetResult {
     pullRequests,
     issueCount: pullRequests.length,
     rateLimit: { remaining: 4998, limit: 5000, resetAt: h(-1) },
+    viewerLogin: "jordan",
     truncated: false,
   };
 }
