@@ -14,12 +14,28 @@ import {
   relativeAge,
   reviewStatus,
   type Agent,
+  type CiStatus,
+  type ReviewStatus,
 } from "./lib/derive";
 import { demoResult } from "./lib/demo";
 import { Chevron, CiIcon, GithubMark, Logo } from "./lib/icons";
 import { BRAND_PATHS, BrandMark } from "./lib/brand";
 
-type Filter = "all" | "agents" | "review";
+type Filter = "all" | "review";
+
+const CI_LABEL: Record<CiStatus, string> = {
+  success: "Passing",
+  failure: "Failing",
+  pending: "Running",
+  queued: "Queued",
+  none: "No checks",
+};
+
+const REVIEW_LABEL: Record<ReviewStatus, string> = {
+  approved: "Approved",
+  changes: "Changes requested",
+  review: "Waiting for review",
+};
 
 interface Settings {
   host: string;
@@ -102,27 +118,16 @@ export function App() {
 
   const prs = result?.pullRequests ?? [];
   const counts = useMemo(() => {
-    let agents = 0,
-      review = 0;
-    for (const pr of prs) {
-      if (detectAgent(pr)) agents++;
-      if (reviewStatus(pr) === "review") review++;
-    }
-    return { all: prs.length, agents, review };
+    let review = 0;
+    for (const pr of prs) if (reviewStatus(pr) === "review") review++;
+    return { all: prs.length, review };
   }, [prs]);
 
   const visible = useMemo(
     () =>
-      prs.filter((pr) => {
-        switch (filter) {
-          case "agents":
-            return !!detectAgent(pr);
-          case "review":
-            return reviewStatus(pr) === "review";
-          default:
-            return true;
-        }
-      }),
+      prs.filter((pr) =>
+        filter === "review" ? reviewStatus(pr) === "review" : true,
+      ),
     [prs, filter],
   );
 
@@ -271,8 +276,7 @@ export function App() {
           <nav className="filters">
             {(
               [
-                ["all", "All"],
-                ["agents", "Agents"],
+                ["all", "My PRs"],
                 ["review", "Needs review"],
               ] as Array<[Filter, string]>
             ).map(([key, label]) => (
@@ -359,10 +363,18 @@ export function App() {
                             {pr.isDraft && <span className="tk">draft</span>}
                           </div>
                         </div>
-                        <span className={`ci ci-${ci}`} title={`CI: ${ci}`}>
+                        <a
+                          className={`ci ci-${ci}`}
+                          href={`${pr.url}/checks`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Open CI checks on GitHub"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <CiIcon status={ci} />
-                        </span>
-                        <span className={`rev rev-${rev}`}>{rev}</span>
+                          <span className="ci-label">{CI_LABEL[ci]}</span>
+                        </a>
+                        <span className={`rev rev-${rev}`}>{REVIEW_LABEL[rev]}</span>
                         <span className="size">
                           <span className="add">+{pr.additions}</span>
                           <span className="del">−{pr.deletions}</span>

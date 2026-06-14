@@ -12,6 +12,8 @@ export interface PullRequest {
   additions: number;
   deletions: number;
   changedFiles: number;
+  headRefName: string;
+  bodyText: string;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN" | null;
   reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
   author: { login: string; avatarUrl: string; __typename: string } | null;
@@ -63,6 +65,8 @@ query Fleet($q: String!, $first: Int!, $after: String) {
         additions
         deletions
         changedFiles
+        headRefName
+        bodyText
         mergeable
         reviewDecision
         author { login avatarUrl __typename }

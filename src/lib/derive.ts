@@ -3,14 +3,76 @@
 
 import type { CheckState, PullRequest } from "./github";
 
-const AGENTS: Array<{ label: string; color: string; match: RegExp }> = [
-  { label: "claude", color: "#D97757", match: /claude/i },
-  { label: "cursor", color: "#A7E0FF", match: /cursor/i },
-  { label: "devin", color: "#6B8AFE", match: /devin/i },
-  { label: "copilot", color: "#C9C7C2", match: /copilot/i },
-  { label: "codex", color: "#9AE6C0", match: /codegen|sweep|codex/i },
-  { label: "dependabot", color: "#2188FF", match: /dependabot/i },
-  { label: "renovate", color: "#FE8B00", match: /renovate/i },
+// Each agent is identified by any of three signals — because coding agents
+// frequently commit under the *human's* GitHub account, so author alone misses
+// them. Branch prefixes and PR-body attribution are the reliable tells.
+//   - login:  the PR author (covers GitHub-App / bot authors)
+//   - branch: head-branch prefix the agent creates (cursor/…, copilot/…, …)
+//   - body:   attribution the agent writes into the PR description
+// Body matchers are kept specific to avoid matching incidental mentions.
+interface AgentDef {
+  label: string;
+  color: string;
+  login?: RegExp;
+  branch?: RegExp;
+  body?: RegExp;
+}
+
+const AGENTS: AgentDef[] = [
+  {
+    label: "claude",
+    color: "#D97757",
+    login: /claude/i,
+    branch: /^claude\//i,
+    body: /claude code|claude\.com\/claude-code|Co-Authored-By:\s*Claude/i,
+  },
+  {
+    label: "cursor",
+    color: "#A7E0FF",
+    login: /^cursor(agent|\[bot\])?$/i,
+    branch: /^cursor\//i,
+    body: /generated (with|by) cursor|cursor\.com/i,
+  },
+  {
+    label: "codex",
+    color: "#9AE6C0",
+    login: /codex/i,
+    branch: /^codex\//i,
+    body: /openai codex|generated (with|by) codex/i,
+  },
+  {
+    label: "devin",
+    color: "#6B8AFE",
+    login: /devin/i,
+    branch: /^devin\//i,
+    body: /devin\.ai|cognition/i,
+  },
+  {
+    label: "copilot",
+    color: "#C9C7C2",
+    login: /copilot/i,
+    branch: /^copilot\//i,
+    body: /github copilot|copilot coding agent/i,
+  },
+  {
+    label: "jules",
+    color: "#F6B73C",
+    login: /jules/i,
+    branch: /^jules\//i,
+    body: /google labs jules/i,
+  },
+  {
+    label: "dependabot",
+    color: "#2188FF",
+    login: /dependabot/i,
+    branch: /^dependabot\//i,
+  },
+  {
+    label: "renovate",
+    color: "#FE8B00",
+    login: /renovate/i,
+    branch: /^renovate\//i,
+  },
 ];
 
 export interface Agent {
@@ -19,14 +81,19 @@ export interface Agent {
   isBot: boolean;
 }
 
-// Identify automated authors. Catches named agents, GitHub Apps ("…[bot]"),
-// and the Bot GraphQL typename. Returns null for ordinary human authors.
 export function detectAgent(pr: PullRequest): Agent | null {
   const login = pr.author?.login ?? "";
+  const branch = pr.headRefName ?? "";
+  const body = pr.bodyText ?? "";
   for (const a of AGENTS) {
-    if (a.match.test(login))
+    if (
+      a.login?.test(login) ||
+      a.branch?.test(branch) ||
+      a.body?.test(body)
+    )
       return { label: a.label, color: a.color, isBot: true };
   }
+  // Any other GitHub App / bot author, surfaced generically.
   const isBot = pr.author?.__typename === "Bot" || /\[bot\]$/i.test(login);
   if (isBot)
     return { label: login.replace(/\[bot\]$/i, ""), color: "#9C9488", isBot: true };
