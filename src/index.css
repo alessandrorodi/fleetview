@@ -425,7 +425,8 @@ button:focus-visible {
   color: var(--text-3);
 }
 
-/* ---- CI pill (links to checks) ---- */
+/* ---- CI status light (links to checks) ---- */
+/* color classes drive both the row light and the repo rollup dot */
 .ci-success {
   color: var(--pass);
 }
@@ -436,7 +437,7 @@ button:focus-visible {
   color: var(--pending);
 }
 .ci-queued {
-  color: var(--queued);
+  color: var(--text-3);
 }
 .ci-none {
   color: var(--text-3);
@@ -444,35 +445,42 @@ button:focus-visible {
 .ci {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   justify-self: start;
-  padding: 4px 11px;
-  border-radius: 999px;
   font-family: var(--font-mono);
   font-size: 11px;
+  color: var(--text-2);
   text-decoration: none;
-  transition: filter 0.14s ease;
-}
-.ci.ci-success {
-  background: color-mix(in srgb, var(--pass) 13%, transparent);
-}
-.ci.ci-failure {
-  background: color-mix(in srgb, var(--fail) 14%, transparent);
-}
-.ci.ci-pending {
-  background: color-mix(in srgb, var(--pending) 14%, transparent);
-}
-.ci.ci-queued {
-  background: color-mix(in srgb, var(--queued) 14%, transparent);
-}
-.ci.ci-none {
-  background: color-mix(in srgb, var(--text-3) 12%, transparent);
 }
 .ci:hover {
-  filter: brightness(1.16);
+  color: var(--text);
+}
+.ci-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.ci-dot.ci-pending {
+  animation: ci-pulse 1.6s ease-out infinite;
 }
 .ci-label {
   white-space: nowrap;
+}
+@keyframes ci-pulse {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pending) 55%, transparent);
+  }
+  70% {
+    opacity: 0.5;
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--pending) 0%, transparent);
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pending) 0%, transparent);
+  }
 }
 
 .rev {

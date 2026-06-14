@@ -19,7 +19,7 @@ import {
   type ReviewStatus,
 } from "./lib/derive";
 import { demoResult } from "./lib/demo";
-import { Chevron, CiIcon, GithubMark, Logo, XMark } from "./lib/icons";
+import { Chevron, GithubMark, Logo, XMark } from "./lib/icons";
 import { BRAND_PATHS, BrandMark } from "./lib/brand";
 
 type Filter = "all" | "review";
@@ -427,14 +427,14 @@ export function App() {
                           </div>
                         </div>
                         <a
-                          className={`ci ci-${ci}`}
+                          className="ci"
                           href={`${pr.url}/checks`}
                           target="_blank"
                           rel="noreferrer"
-                          title="Open CI checks on GitHub"
+                          title={`${CI_LABEL[ci]} — open checks`}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <CiIcon status={ci} />
+                          <span className={`ci-dot ci-${ci}`} />
                           <span className="ci-label">{CI_LABEL[ci]}</span>
                         </a>
                         <span className={`rev rev-${rev}`}>{REVIEW_LABEL[rev]}</span>
