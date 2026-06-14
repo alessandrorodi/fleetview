@@ -211,6 +211,23 @@ button:focus-visible {
   display: flex;
   gap: 10px;
 }
+.settings .settings-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.settings .settings-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+}
+.settings .settings-check code {
+  font-size: 11px;
+}
 
 /* ---- error ---- */
 .error {

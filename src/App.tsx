@@ -22,7 +22,10 @@ import { demoResult } from "./lib/demo";
 import { CheckIcon, Chevron, CopyIcon, GithubMark, Logo, XMark } from "./lib/icons";
 import { BRAND_PATHS, BrandMark } from "./lib/brand";
 
-type Filter = "all" | "review";
+type Filter = "all" | "review" | "toreview";
+
+const REVIEW_REQUESTED_QUERY =
+  "is:open is:pr review-requested:@me archived:false sort:updated-desc";
 
 const CI_LABEL: Record<CiStatus, string> = {
   success: "CI: passing",
@@ -42,6 +45,7 @@ interface Settings {
   host: string;
   token: string;
   query: string;
+  showToReview: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -50,6 +54,7 @@ const DEFAULTS: Settings = {
   query:
     import.meta.env.VITE_GH_QUERY ||
     "is:open is:pr involves:@me archived:false sort:updated-desc",
+  showToReview: true,
 };
 
 const STORAGE_KEY = "fleetview.settings";
@@ -78,6 +83,7 @@ export function App() {
   const [cursor, setCursor] = useState(-1);
   const [acting, setActing] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [loadedToReview, setLoadedToReview] = useState(false);
 
   const loadDemo = useCallback(() => {
     localStorage.setItem(DEMO_KEY, "1");
@@ -87,58 +93,109 @@ export function App() {
     setShowSettings(false);
   }, []);
 
-  const refresh = useCallback(async (s: Settings) => {
-    if (!s.token) {
-      setShowSettings(true);
-      return;
-    }
-    localStorage.removeItem(DEMO_KEY);
-    setDemo(false);
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetchFleet({
-        endpoint: endpointForHost(s.host),
-        token: s.token,
-        query: s.query,
-      });
-      setResult(r);
-      setShowSettings(false);
-    } catch (e) {
-      setError(e instanceof GitHubError ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const refresh = useCallback(
+    async (s: Settings, query: string, reviewRequested: boolean) => {
+      if (!s.token) {
+        setShowSettings(true);
+        return;
+      }
+      localStorage.removeItem(DEMO_KEY);
+      setDemo(false);
+      setLoading(true);
+      setError(null);
+      try {
+        const r = await fetchFleet({
+          endpoint: endpointForHost(s.host),
+          token: s.token,
+          query,
+        });
+        setResult(r);
+        setLoadedToReview(reviewRequested);
+        setShowSettings(false);
+      } catch (e) {
+        setError(e instanceof GitHubError ? e.message : String(e));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (localStorage.getItem(DEMO_KEY)) loadDemo();
-    else if (settings.token) void refresh(settings);
+    else if (settings.token) void refresh(settings, settings.query, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const reload = () => (demo ? loadDemo() : void refresh(settings));
+  // "To review" uses the review-requested search; other tabs share the
+  // configured query. Switching across that boundary triggers a refetch.
+  const queryFor = (f: Filter, s: Settings) =>
+    f === "toreview" ? REVIEW_REQUESTED_QUERY : s.query;
+
+  const reload = () =>
+    demo
+      ? loadDemo()
+      : void refresh(settings, queryFor(filter, settings), filter === "toreview");
+
+  const selectTab = (key: Filter) => {
+    setFilter(key);
+    if (!demo && (key === "toreview") !== loadedToReview)
+      void refresh(settings, queryFor(key, settings), key === "toreview");
+  };
+
+  // If the "To review" tab is turned off while it's active, fall back to My PRs.
+  useEffect(() => {
+    if (!settings.showToReview && filter === "toreview") {
+      setFilter("all");
+      if (!demo && loadedToReview)
+        void refresh(settings, settings.query, false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.showToReview]);
 
   const prs = result?.pullRequests ?? [];
-  const counts = useMemo(() => {
+  const viewer = result?.viewerLogin ?? "";
+
+  // Demo has no second fetch, so approximate "To review" as others' PRs.
+  const isOthersPR = (pr: PullRequest) =>
+    !!pr.author?.login && (!viewer || pr.author.login !== viewer);
+
+  const counts = useMemo<Record<Filter, number | undefined>>(() => {
+    if (demo) {
+      let review = 0,
+        toreview = 0;
+      for (const pr of prs) {
+        if (reviewStatus(pr) === "review") review++;
+        if (isOthersPR(pr)) toreview++;
+      }
+      return { all: prs.length, review, toreview };
+    }
+    // Real data: only the currently-loaded source has a known count.
+    if (loadedToReview)
+      return { all: undefined, review: undefined, toreview: prs.length };
     let review = 0;
     for (const pr of prs) if (reviewStatus(pr) === "review") review++;
-    return { all: prs.length, review };
-  }, [prs]);
+    return { all: prs.length, review, toreview: undefined };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prs, demo, loadedToReview, viewer]);
 
   const visible = useMemo(
     () =>
-      prs.filter((pr) =>
-        filter === "review" ? reviewStatus(pr) === "review" : true,
-      ),
-    [prs, filter],
+      prs.filter((pr) => {
+        if (filter === "review") return reviewStatus(pr) === "review";
+        if (filter === "toreview") return demo ? isOthersPR(pr) : true;
+        return true;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [prs, filter, demo, viewer],
   );
 
   const grouped = useMemo(() => groupByRepo(visible), [visible]);
 
   const saveAndRefresh = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    void refresh(settings);
+    setFilter("all");
+    void refresh(settings, settings.query, false);
   };
 
   const prKey = (pr: PullRequest) => `${pr.repository.nameWithOwner}#${pr.number}`;
@@ -192,7 +249,7 @@ export function App() {
     );
     if (ok) {
       setSelected(new Set());
-      void refresh(settings);
+      void refresh(settings, queryFor(filter, settings), filter === "toreview");
     }
   };
 
@@ -298,6 +355,21 @@ export function App() {
               e.g. <code>org:acme is:open is:pr</code> for a whole org's fleet.
             </small>
           </label>
+          <label className="settings-check">
+            <input
+              type="checkbox"
+              checked={settings.showToReview}
+              onChange={(e) => {
+                const next = { ...settings, showToReview: e.target.checked };
+                setSettings(next);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+              }}
+            />
+            <span>
+              Show “To review” tab — PRs awaiting your review (
+              <code>review-requested:@me</code>)
+            </span>
+          </label>
           <div className="settings-actions">
             <button className="primary" onClick={saveAndRefresh}>
               Save &amp; load
@@ -322,15 +394,18 @@ export function App() {
               [
                 ["all", "My PRs"],
                 ["review", "Needs review"],
+                ...(settings.showToReview
+                  ? ([["toreview", "To review"]] as Array<[Filter, string]>)
+                  : []),
               ] as Array<[Filter, string]>
             ).map(([key, label]) => (
               <button
                 key={key}
                 className={`tab${filter === key ? " on" : ""}`}
-                onClick={() => setFilter(key)}
+                onClick={() => selectTab(key)}
               >
                 {label}
-                <em>{counts[key]}</em>
+                {counts[key] !== undefined && <em>{counts[key]}</em>}
               </button>
             ))}
           </nav>

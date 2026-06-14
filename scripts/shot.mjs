@@ -9,6 +9,7 @@ const page = await browser.newPage({
   viewport: { width: 1040, height: 860 },
   deviceScaleFactor: 2,
   colorScheme: "dark",
+  reducedMotion: "reduce", // disable reveal animations so nothing is mid-fade
 });
 // Force demo mode so we never render real PRs.
 await page.addInitScript(() => localStorage.setItem("fleetview.demo", "1"));
