@@ -15,8 +15,9 @@
   --queued: #5b9bf0;
   --fail: #e36a5e;
   --dot: rgba(236, 231, 222, 0.04);
-  --font-sans: "Hanken Grotesk", ui-sans-serif, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Hanken Grotesk Variable", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo,
+    monospace;
 }
 
 @media (prefers-color-scheme: light) {
