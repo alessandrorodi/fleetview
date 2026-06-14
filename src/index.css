@@ -329,7 +329,7 @@ button:focus-visible {
 /* ---- row ---- */
 .row {
   display: grid;
-  grid-template-columns: 16px 26px minmax(0, 1fr) 124px 150px 84px 38px;
+  grid-template-columns: 16px 26px minmax(0, 1fr) 124px 150px 84px 36px 28px;
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
@@ -517,6 +517,34 @@ button:focus-visible {
   font-size: 11px;
   color: var(--text-3);
   text-align: right;
+}
+
+/* hover-revealed copy-link button */
+.copy {
+  justify-self: end;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+.row:hover .copy,
+.copy:focus-visible {
+  opacity: 1;
+}
+.copy:hover {
+  background: var(--line-2);
+  color: var(--text);
+}
+.copy.copied {
+  opacity: 1;
+  color: var(--pass);
 }
 
 /* ---- floating bulk-action pill ---- */

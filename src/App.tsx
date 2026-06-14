@@ -19,7 +19,7 @@ import {
   type ReviewStatus,
 } from "./lib/derive";
 import { demoResult } from "./lib/demo";
-import { Chevron, GithubMark, Logo, XMark } from "./lib/icons";
+import { CheckIcon, Chevron, CopyIcon, GithubMark, Logo, XMark } from "./lib/icons";
 import { BRAND_PATHS, BrandMark } from "./lib/brand";
 
 type Filter = "all" | "review";
@@ -443,6 +443,7 @@ export function App() {
                           <span className="del">−{pr.deletions}</span>
                         </span>
                         <span className="age">{relativeAge(pr.createdAt)}</span>
+                        <CopyButton url={pr.url} />
                       </div>
                     );
                   })}
@@ -484,6 +485,29 @@ export function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function CopyButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      className={`copy${copied ? " copied" : ""}`}
+      title={copied ? "Copied!" : "Copy PR link"}
+      aria-label="Copy PR link"
+      onClick={async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch {
+          /* clipboard may be unavailable */
+        }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? <CheckIcon /> : <CopyIcon />}
+    </button>
   );
 }
 
