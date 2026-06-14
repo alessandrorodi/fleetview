@@ -42,13 +42,16 @@ export interface FleetResult {
   pullRequests: PullRequest[];
   issueCount: number;
   rateLimit: RateLimit;
+  // True when the maxPages cap was hit before all matching PRs were fetched.
+  truncated: boolean;
 }
 
 const QUERY = `
-query Fleet($q: String!, $prCount: Int!) {
+query Fleet($q: String!, $first: Int!, $after: String) {
   rateLimit { remaining limit resetAt }
-  search(query: $q, type: ISSUE, first: $prCount) {
+  search(query: $q, type: ISSUE, first: $first, after: $after) {
     issueCount
+    pageInfo { hasNextPage endCursor }
     nodes {
       ... on PullRequest {
         number
@@ -75,12 +78,13 @@ query Fleet($q: String!, $prCount: Int!) {
 
 export class GitHubError extends Error {}
 
-export async function fetchFleet(opts: {
+async function postPage(opts: {
   endpoint: string;
   token: string;
   query: string;
-  prCount?: number;
-}): Promise<FleetResult> {
+  first: number;
+  after: string | null;
+}) {
   const res = await fetch(opts.endpoint, {
     method: "POST",
     headers: {
@@ -89,7 +93,7 @@ export async function fetchFleet(opts: {
     },
     body: JSON.stringify({
       query: QUERY,
-      variables: { q: opts.query, prCount: opts.prCount ?? 50 },
+      variables: { q: opts.query, first: opts.first, after: opts.after },
     }),
   });
 
@@ -100,20 +104,50 @@ export async function fetchFleet(opts: {
 
   const body = await res.json();
   if (body.errors?.length)
-    throw new GitHubError(body.errors.map((e: { message: string }) => e.message).join("; "));
+    throw new GitHubError(
+      body.errors.map((e: { message: string }) => e.message).join("; "),
+    );
+  return body.data;
+}
 
-  const search = body.data.search;
-  // `type: ISSUE` returns issues too; the inline fragment leaves non-PR nodes
-  // as empty objects, so filter to nodes that actually carried PR fields.
-  const pullRequests: PullRequest[] = search.nodes.filter(
-    (n: Partial<PullRequest>) => n && typeof n.number === "number",
-  );
+// Paginate through the search results up to a page cap so large fleets load
+// without an unbounded number of requests (each page is one rate-limit hit).
+export async function fetchFleet(opts: {
+  endpoint: string;
+  token: string;
+  query: string;
+  pageSize?: number;
+  maxPages?: number;
+}): Promise<FleetResult> {
+  const pageSize = opts.pageSize ?? 50;
+  const maxPages = opts.maxPages ?? 6;
 
-  return {
-    pullRequests,
-    issueCount: search.issueCount,
-    rateLimit: body.data.rateLimit,
-  };
+  const pullRequests: PullRequest[] = [];
+  let issueCount = 0;
+  let rateLimit: RateLimit = { remaining: 0, limit: 0, resetAt: "" };
+  let after: string | null = null;
+  let pages = 0;
+  let truncated = false;
+
+  do {
+    const data = await postPage({ ...opts, first: pageSize, after });
+    const search = data.search;
+    rateLimit = data.rateLimit;
+    issueCount = search.issueCount;
+    // `type: ISSUE` returns issues too; the inline fragment leaves non-PR
+    // nodes as empty objects, so keep only those that carried PR fields.
+    for (const n of search.nodes as Array<Partial<PullRequest>>) {
+      if (n && typeof n.number === "number") pullRequests.push(n as PullRequest);
+    }
+    pages++;
+    after = search.pageInfo.hasNextPage ? search.pageInfo.endCursor : null;
+    if (after && pages >= maxPages) {
+      truncated = true;
+      after = null;
+    }
+  } while (after);
+
+  return { pullRequests, issueCount, rateLimit, truncated };
 }
 
 // Derive the GraphQL endpoint from a host. github.com → api.github.com/graphql;

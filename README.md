@@ -62,13 +62,14 @@ npm run preview    # serve the production build locally
 - Cross-PR conflict radar (file overlap) with cross-linked PRs.
 - CI status at three levels: per-PR chip, per-repo rollup dot, and a fleet-wide summary (passing / failing / running / queued).
 - Keyboard triage: `j`/`k` move, `x` select, `o` open.
-- Demo mode (no token required) and dark / light themes.
+- Paginated fetch so large fleets load fully (with a page cap + "showing X of Y" notice).
+- Self-contained demo mode (vendored brand marks, no runtime CDN) and dark / light themes.
 
 ## Roadmap
 
 - Write actions (approve / merge / close) from the board, behind an opt-in write-scoped token.
 - Browser-extension build (zero-setup auth via your live github.com session; CORS-free GHES access).
-- Vendored brand marks for demo mode (drop the runtime `cdn.simpleicons.org` calls — fully self-contained).
+- Vendor the web fonts (drop the Google Fonts runtime call) for fully offline / air-gapped use.
 - Sorting + saved views (by risk / age / CI).
 - Optional, bring-your-own-key LLM pass for per-PR risk/summary — run from the browser against the diff, still no server.
 - Suggested safe-merge ordering from the conflict graph + CI state.

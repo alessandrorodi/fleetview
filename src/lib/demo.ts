@@ -40,7 +40,7 @@ export function demoResult(): FleetResult {
       repo: "acme/api",
       author: {
         login: "claude[bot]",
-        avatarUrl: "https://cdn.simpleicons.org/claude/D97757",
+        avatarUrl: "",
         __typename: "Bot",
       },
       additions: 142,
@@ -55,7 +55,7 @@ export function demoResult(): FleetResult {
       repo: "acme/api",
       author: {
         login: "cursor[bot]",
-        avatarUrl: "https://cdn.simpleicons.org/cursor/A7E0FF",
+        avatarUrl: "",
         __typename: "Bot",
       },
       additions: 38,
@@ -70,7 +70,7 @@ export function demoResult(): FleetResult {
       repo: "acme/api",
       author: {
         login: "dependabot[bot]",
-        avatarUrl: "https://cdn.simpleicons.org/dependabot/2188FF",
+        avatarUrl: "",
         __typename: "Bot",
       },
       additions: 612,
@@ -86,7 +86,7 @@ export function demoResult(): FleetResult {
       repo: "acme/api",
       author: {
         login: "claude[bot]",
-        avatarUrl: "https://cdn.simpleicons.org/claude/D97757",
+        avatarUrl: "",
         __typename: "Bot",
       },
       additions: 24,
@@ -101,7 +101,7 @@ export function demoResult(): FleetResult {
       repo: "acme/web",
       author: {
         login: "cursor[bot]",
-        avatarUrl: "https://cdn.simpleicons.org/cursor/A7E0FF",
+        avatarUrl: "",
         __typename: "Bot",
       },
       additions: 287,
@@ -129,5 +129,6 @@ export function demoResult(): FleetResult {
     pullRequests,
     issueCount: pullRequests.length,
     rateLimit: { remaining: 4998, limit: 5000, resetAt: h(-1) },
+    truncated: false,
   };
 }

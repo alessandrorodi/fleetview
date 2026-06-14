@@ -19,6 +19,8 @@ import {
 } from "./lib/derive";
 import { demoResult } from "./lib/demo";
 import { CiIcon, CollideIcon, GithubMark, Logo } from "./lib/icons";
+import { BRAND_PATHS, BrandMark } from "./lib/brand";
+import type { Agent } from "./lib/derive";
 
 type Filter = "all" | "agents" | "review" | "conflicts";
 
@@ -291,6 +293,14 @@ export function App() {
             <span className="kbd-hint">j/k move · x select · o open</span>
           </nav>
 
+          {prs.length < result.issueCount && (
+            <div className="notice">
+              Showing {prs.length} of {result.issueCount} — {result.truncated
+                ? "page cap reached; narrow the query to see the rest."
+                : "some results were not returned."}
+            </div>
+          )}
+
           {grouped.length === 0 && (
             <div className="empty">No pull requests match this filter.</div>
           )}
@@ -336,6 +346,7 @@ export function App() {
                       <Avatar
                         url={pr.author?.avatarUrl}
                         login={pr.author?.login ?? "?"}
+                        agent={agent}
                       />
                       <div className="main">
                         <div className="title-line">
@@ -411,12 +422,28 @@ function CiSummary({ counts }: { counts: Record<CiStatus, number> }) {
   );
 }
 
-function Avatar({ url, login }: { url?: string; login: string }) {
+function Avatar({
+  url,
+  login,
+  agent,
+}: {
+  url?: string;
+  login: string;
+  agent: Agent | null;
+}) {
   const [ok, setOk] = useState(!!url);
+  // Live data: the author's real GitHub avatar (a bot's avatar is its mark).
   if (ok && url)
     return (
       <span className="avatar">
         <img src={url} alt="" onError={() => setOk(false)} />
+      </span>
+    );
+  // No avatar (demo / ghost author): vendored brand mark when we recognise it.
+  if (agent && BRAND_PATHS[agent.label])
+    return (
+      <span className="avatar brand">
+        <BrandMark label={agent.label} color={agent.color} />
       </span>
     );
   return (

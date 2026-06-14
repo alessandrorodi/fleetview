@@ -566,6 +566,17 @@ button:focus-visible {
   font-size: 12px;
 }
 
+.notice {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
 .empty {
   text-align: center;
   color: var(--text-3);
