@@ -20,7 +20,7 @@ import {
   type ReviewStatus,
 } from "./lib/derive";
 import { demoResult } from "./lib/demo";
-import { Chevron, CiIcon, GithubMark, Logo } from "./lib/icons";
+import { Chevron, CiIcon, GithubMark, Logo, XMark } from "./lib/icons";
 import { BRAND_PATHS, BrandMark } from "./lib/brand";
 
 type Filter = "all" | "review";
@@ -357,17 +357,19 @@ export function App() {
                   onClick={() => toggleRepo(repo)}
                   aria-expanded={open}
                 >
-                  <Chevron open={open} />
+                  <span className="repo-chevron">
+                    <Chevron open={open} />
+                  </span>
                   <span
                     className={`repo-ci ci-${ciRollup(group)}`}
                     title={`CI rollup: ${ciRollup(group)}`}
                   />
                   <span className="repo-name">{repo}</span>
-                  <span className="rule" />
-                  <span className="repo-meta">{group.length} open</span>
+                  <span className="repo-count">{group.length} open</span>
                 </button>
-                {open &&
-                  group.map((pr) => {
+                {open && (
+                  <div className="repo-rows">
+                  {group.map((pr) => {
                     const agent = detectAgent(pr);
                     const ci = ciStatus(pr);
                     const rev = reviewStatus(pr);
@@ -439,6 +441,8 @@ export function App() {
                       </div>
                     );
                   })}
+                  </div>
+                )}
               </section>
             );
           })}
@@ -451,20 +455,26 @@ export function App() {
 
       {selected.size > 0 && (
         <div className="cmdbar">
-          <strong>{selected.size}</strong> selected
-          {actionMsg && <span className="muted">· {actionMsg}</span>}
-          <div className="grow" />
-          <button className="ghost" disabled={acting} onClick={() => runBulk("approve")}>
+          <button
+            className="cmd-clear"
+            onClick={() => setSelected(new Set())}
+            aria-label="Clear selection"
+          >
+            <XMark />
+          </button>
+          <span className="cmd-count">
+            <strong>{selected.size}</strong> selected
+          </span>
+          {actionMsg && <span className="cmd-msg">{actionMsg}</span>}
+          <div className="cmd-sep" />
+          <button className="cmd-act" disabled={acting} onClick={() => runBulk("approve")}>
             Approve
           </button>
-          <button className="ghost act-merge" disabled={acting} onClick={() => runBulk("merge")}>
+          <button className="cmd-act cmd-merge" disabled={acting} onClick={() => runBulk("merge")}>
             Merge
           </button>
-          <button className="ghost act-close" disabled={acting} onClick={() => runBulk("close")}>
+          <button className="cmd-act cmd-close" disabled={acting} onClick={() => runBulk("close")}>
             Close
-          </button>
-          <button className="ghost" disabled={acting} onClick={() => setSelected(new Set())}>
-            Clear
           </button>
         </div>
       )}
