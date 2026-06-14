@@ -335,6 +335,8 @@ button:focus-visible {
   padding: 14px 16px;
   border-top: 1px solid var(--line);
   position: relative;
+  cursor: pointer;
+  user-select: none;
   animation: rise 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 .repo-rows .row:first-child {

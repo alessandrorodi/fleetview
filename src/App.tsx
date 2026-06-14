@@ -380,6 +380,13 @@ export function App() {
                         }`}
                         key={key}
                         style={{ animationDelay: `${Math.min(rowIndex++, 14) * 22}ms` }}
+                        onClick={(e) => {
+                          // Let links / the checkbox handle their own clicks;
+                          // anywhere else on the row toggles selection.
+                          if ((e.target as HTMLElement).closest("a, button, input, label"))
+                            return;
+                          toggle(key);
+                        }}
                       >
                         <input
                           type="checkbox"
