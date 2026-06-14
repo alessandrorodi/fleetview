@@ -70,6 +70,30 @@ export function CiIcon({ status }: { status: CiStatus }) {
   );
 }
 
+export function Chevron({ open, size = 12 }: { open: boolean; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      aria-hidden
+      style={{
+        transform: open ? "rotate(90deg)" : "none",
+        transition: "transform 0.15s ease",
+      }}
+    >
+      <path
+        d="M6 4l4 4-4 4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function CollideIcon({ size = 13 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden>

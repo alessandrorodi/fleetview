@@ -272,20 +272,6 @@ button:focus-visible {
 .tab.on em {
   color: var(--accent);
 }
-.tab.on.danger {
-  border-bottom-color: var(--fail);
-}
-.tab.on.danger em {
-  color: var(--fail);
-}
-.kbd-hint {
-  margin-left: auto;
-  align-self: center;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--text-3);
-  padding-right: 4px;
-}
 
 /* ---- repo group ---- */
 .repo {
@@ -294,9 +280,22 @@ button:focus-visible {
 .repo-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
   margin-bottom: 8px;
-  padding: 0 2px;
+  padding: 5px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: var(--text-3);
+  text-align: left;
+  cursor: pointer;
+}
+.repo-head:hover {
+  color: var(--text-2);
+}
+.repo-head:hover .rule {
+  background: var(--line-2);
 }
 .repo-name {
   font-family: var(--font-mono);
@@ -315,12 +314,6 @@ button:focus-visible {
   font-size: 11px;
   color: var(--text-3);
 }
-.repo-collide {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fail);
-}
-
 /* ---- row ---- */
 .row {
   display: grid;
@@ -343,15 +336,9 @@ button:focus-visible {
   border-color: var(--accent);
   box-shadow: inset 2px 0 0 var(--accent);
 }
-.row.collides {
-  box-shadow: inset 2px 0 0 var(--fail);
-}
 .row.cur {
   outline: 1.5px solid var(--accent);
   outline-offset: -1px;
-}
-.row.collides.sel {
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 .row input[type="checkbox"] {
   width: 14px;
@@ -428,9 +415,6 @@ button:focus-visible {
   font-size: 11px;
   color: var(--text-3);
 }
-.tk.collide {
-  color: var(--fail);
-}
 
 /* shared CI state colors (used by the chip, repo dot, and header summary) */
 .ci-success {
@@ -480,26 +464,6 @@ button:focus-visible {
   flex-shrink: 0;
 }
 
-/* header fleet CI summary */
-.cistat {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-.cseg {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.cidot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
 
 .rev {
   font-family: var(--font-mono);

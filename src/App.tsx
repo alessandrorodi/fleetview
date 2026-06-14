@@ -7,22 +7,19 @@ import {
   type PullRequest,
 } from "./lib/github";
 import {
-  ciCounts,
   ciRollup,
   ciStatus,
   detectAgent,
-  detectConflicts,
   groupByRepo,
   relativeAge,
   reviewStatus,
-  type CiStatus,
+  type Agent,
 } from "./lib/derive";
 import { demoResult } from "./lib/demo";
-import { CiIcon, CollideIcon, GithubMark, Logo } from "./lib/icons";
+import { Chevron, CiIcon, GithubMark, Logo } from "./lib/icons";
 import { BRAND_PATHS, BrandMark } from "./lib/brand";
-import type { Agent } from "./lib/derive";
 
-type Filter = "all" | "agents" | "review" | "conflicts";
+type Filter = "all" | "agents" | "review";
 
 interface Settings {
   host: string;
@@ -31,9 +28,11 @@ interface Settings {
 }
 
 const DEFAULTS: Settings = {
-  host: "github.com",
-  token: "",
-  query: "is:open is:pr involves:@me archived:false sort:updated-desc",
+  host: import.meta.env.VITE_GH_HOST || "github.com",
+  token: import.meta.env.VITE_GH_TOKEN || "",
+  query:
+    import.meta.env.VITE_GH_QUERY ||
+    "is:open is:pr involves:@me archived:false sort:updated-desc",
 };
 
 const STORAGE_KEY = "fleetview.settings";
@@ -57,8 +56,9 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [demo, setDemo] = useState(false);
-  const [cursor, setCursor] = useState(0);
+  const [cursor, setCursor] = useState(-1);
 
   const loadDemo = useCallback(() => {
     localStorage.setItem(DEMO_KEY, "1");
@@ -100,11 +100,6 @@ export function App() {
 
   const reload = () => (demo ? loadDemo() : void refresh(settings));
 
-  const conflicts = useMemo(
-    () => (result ? detectConflicts(result.pullRequests) : null),
-    [result],
-  );
-
   const prs = result?.pullRequests ?? [];
   const counts = useMemo(() => {
     let agents = 0,
@@ -113,13 +108,8 @@ export function App() {
       if (detectAgent(pr)) agents++;
       if (reviewStatus(pr) === "review") review++;
     }
-    return {
-      all: prs.length,
-      agents,
-      review,
-      conflicts: conflicts ? conflicts.collisions.size : 0,
-    };
-  }, [prs, conflicts]);
+    return { all: prs.length, agents, review };
+  }, [prs]);
 
   const visible = useMemo(
     () =>
@@ -129,13 +119,11 @@ export function App() {
             return !!detectAgent(pr);
           case "review":
             return reviewStatus(pr) === "review";
-          case "conflicts":
-            return conflicts?.collisions.has(pr.number);
           default:
             return true;
         }
       }),
-    [prs, filter, conflicts],
+    [prs, filter],
   );
 
   const grouped = useMemo(() => groupByRepo(visible), [visible]);
@@ -152,11 +140,21 @@ export function App() {
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
+  const toggleRepo = (repo: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(repo) ? next.delete(repo) : next.add(repo);
+      return next;
+    });
 
-  // Keyboard navigation over the flattened visible list (console-style triage).
-  const flatVisible = useMemo(() => grouped.flatMap(([, g]) => g), [grouped]);
+  // Keyboard navigation over the flattened visible (expanded) list. The focus
+  // cursor stays hidden (-1) until the first j/k press.
+  const flatVisible = useMemo(
+    () => grouped.filter(([r]) => !collapsed.has(r)).flatMap(([, g]) => g),
+    [grouped, collapsed],
+  );
   useEffect(() => {
-    setCursor((c) => Math.min(c, Math.max(0, flatVisible.length - 1)));
+    setCursor((c) => (c < 0 ? -1 : Math.min(c, Math.max(0, flatVisible.length - 1))));
   }, [flatVisible.length]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -171,11 +169,11 @@ export function App() {
         setCursor((c) => Math.max(0, c - 1));
         e.preventDefault();
       } else if (e.key === "x") {
-        const pr = flatVisible[cursor];
+        const pr = cursor >= 0 ? flatVisible[cursor] : undefined;
         if (pr) toggle(prKey(pr));
         e.preventDefault();
       } else if (e.key === "o" || e.key === "Enter") {
-        const pr = flatVisible[cursor];
+        const pr = cursor >= 0 ? flatVisible[cursor] : undefined;
         if (pr) window.open(pr.url, "_blank", "noopener");
       }
     };
@@ -186,7 +184,8 @@ export function App() {
     document.querySelector(".row.cur")?.scrollIntoView({ block: "nearest" });
   }, [cursor, grouped]);
 
-  const curKey = flatVisible[cursor] ? prKey(flatVisible[cursor]) : null;
+  const curKey =
+    cursor >= 0 && flatVisible[cursor] ? prKey(flatVisible[cursor]) : null;
   let rowIndex = 0;
 
   return (
@@ -203,7 +202,6 @@ export function App() {
           <GithubMark />
           {settings.host || "github.com"}
         </span>
-        {result && <CiSummary counts={ciCounts(prs)} />}
         {result &&
           (demo ? (
             <span className="badge-demo">demo</span>
@@ -276,21 +274,17 @@ export function App() {
                 ["all", "All"],
                 ["agents", "Agents"],
                 ["review", "Needs review"],
-                ["conflicts", "Conflicts"],
               ] as Array<[Filter, string]>
             ).map(([key, label]) => (
               <button
                 key={key}
-                className={`tab${filter === key ? " on" : ""}${
-                  key === "conflicts" ? " danger" : ""
-                }`}
+                className={`tab${filter === key ? " on" : ""}`}
                 onClick={() => setFilter(key)}
               >
                 {label}
                 <em>{counts[key]}</em>
               </button>
             ))}
-            <span className="kbd-hint">j/k move · x select · o open</span>
           </nav>
 
           {prs.length < result.issueCount && (
@@ -306,12 +300,15 @@ export function App() {
           )}
 
           {grouped.map(([repo, group]) => {
-            const collide = group.filter((p) =>
-              conflicts?.collisions.has(p.number),
-            ).length;
+            const open = !collapsed.has(repo);
             return (
               <section className="repo" key={repo}>
-                <div className="repo-head">
+                <button
+                  className="repo-head"
+                  onClick={() => toggleRepo(repo)}
+                  aria-expanded={open}
+                >
+                  <Chevron open={open} />
                   <span
                     className={`repo-ci ci-${ciRollup(group)}`}
                     title={`CI rollup: ${ciRollup(group)}`}
@@ -319,69 +316,61 @@ export function App() {
                   <span className="repo-name">{repo}</span>
                   <span className="rule" />
                   <span className="repo-meta">{group.length} open</span>
-                  {collide > 0 && (
-                    <span className="repo-collide">{collide} collide</span>
-                  )}
-                </div>
-                {group.map((pr) => {
-                  const agent = detectAgent(pr);
-                  const ci = ciStatus(pr);
-                  const rev = reviewStatus(pr);
-                  const collidesWith = conflicts?.collisions.get(pr.number);
-                  const key = prKey(pr);
-                  return (
-                    <div
-                      className={`row${collidesWith ? " collides" : ""}${
-                        selected.has(key) ? " sel" : ""
-                      }${key === curKey ? " cur" : ""}`}
-                      key={key}
-                      style={{ animationDelay: `${Math.min(rowIndex++, 14) * 22}ms` }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected.has(key)}
-                        onChange={() => toggle(key)}
-                        aria-label={`select ${pr.title}`}
-                      />
-                      <Avatar
-                        url={pr.author?.avatarUrl}
-                        login={pr.author?.login ?? "?"}
-                        agent={agent}
-                      />
-                      <div className="main">
-                        <div className="title-line">
-                          <a href={pr.url} target="_blank" rel="noreferrer">
-                            {pr.title}
-                          </a>
-                          <span className="num">#{pr.number}</span>
-                        </div>
-                        <div className="meta-line">
-                          <span
-                            className="who"
-                            style={agent ? { color: agent.color } : undefined}
-                          >
-                            {agent ? agent.label : pr.author?.login ?? "unknown"}
-                          </span>
-                          {pr.isDraft && <span className="tk">draft</span>}
-                          {collidesWith && (
-                            <span className="tk collide">
-                              <CollideIcon /> collides #{collidesWith.join(", #")}
+                </button>
+                {open &&
+                  group.map((pr) => {
+                    const agent = detectAgent(pr);
+                    const ci = ciStatus(pr);
+                    const rev = reviewStatus(pr);
+                    const key = prKey(pr);
+                    return (
+                      <div
+                        className={`row${selected.has(key) ? " sel" : ""}${
+                          key === curKey ? " cur" : ""
+                        }`}
+                        key={key}
+                        style={{ animationDelay: `${Math.min(rowIndex++, 14) * 22}ms` }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected.has(key)}
+                          onChange={() => toggle(key)}
+                          aria-label={`select ${pr.title}`}
+                        />
+                        <Avatar
+                          url={pr.author?.avatarUrl}
+                          login={pr.author?.login ?? "?"}
+                          agent={agent}
+                        />
+                        <div className="main">
+                          <div className="title-line">
+                            <a href={pr.url} target="_blank" rel="noreferrer">
+                              {pr.title}
+                            </a>
+                            <span className="num">#{pr.number}</span>
+                          </div>
+                          <div className="meta-line">
+                            <span
+                              className="who"
+                              style={agent ? { color: agent.color } : undefined}
+                            >
+                              {agent ? agent.label : pr.author?.login ?? "unknown"}
                             </span>
-                          )}
+                            {pr.isDraft && <span className="tk">draft</span>}
+                          </div>
                         </div>
+                        <span className={`ci ci-${ci}`} title={`CI: ${ci}`}>
+                          <CiIcon status={ci} />
+                        </span>
+                        <span className={`rev rev-${rev}`}>{rev}</span>
+                        <span className="size">
+                          <span className="add">+{pr.additions}</span>
+                          <span className="del">−{pr.deletions}</span>
+                        </span>
+                        <span className="age">{relativeAge(pr.createdAt)}</span>
                       </div>
-                      <span className={`ci ci-${ci}`} title={`CI: ${ci}`}>
-                        <CiIcon status={ci} />
-                      </span>
-                      <span className={`rev rev-${rev}`}>{rev}</span>
-                      <span className="size">
-                        <span className="add">+{pr.additions}</span>
-                        <span className="del">−{pr.deletions}</span>
-                      </span>
-                      <span className="age">{relativeAge(pr.createdAt)}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </section>
             );
           })}
@@ -395,7 +384,7 @@ export function App() {
       {selected.size > 0 && (
         <div className="cmdbar">
           <strong>{selected.size}</strong> selected
-          <span className="muted">· bulk actions arrive with a write-scoped token</span>
+          <span className="muted">· bulk approve / merge / close (needs a write-scoped token)</span>
           <div className="grow" />
           <button className="ghost" onClick={() => setSelected(new Set())}>
             Clear
@@ -403,22 +392,6 @@ export function App() {
         </div>
       )}
     </div>
-  );
-}
-
-function CiSummary({ counts }: { counts: Record<CiStatus, number> }) {
-  const order: CiStatus[] = ["success", "failure", "pending", "queued"];
-  const shown = order.filter((k) => counts[k] > 0);
-  if (!shown.length) return null;
-  return (
-    <span className="cistat" title="CI across the fleet">
-      {shown.map((k) => (
-        <span key={k} className={`cseg ci-${k}`}>
-          <span className="cidot" />
-          {counts[k]}
-        </span>
-      ))}
-    </span>
   );
 }
 
