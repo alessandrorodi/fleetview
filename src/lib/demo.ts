@@ -11,6 +11,7 @@ function pr(p: Partial<Omit<PullRequest, "files" | "repository">> & {
   files: string[];
 }): PullRequest {
   return {
+    id: `demo-${p.number}`,
     number: p.number,
     title: p.title,
     url: `https://github.com/${p.repo}/pull/${p.number}`,

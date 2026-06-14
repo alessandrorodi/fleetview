@@ -3,6 +3,7 @@
 // GitHub Enterprise Server by pointing `endpoint` at the right /graphql URL.
 
 export interface PullRequest {
+  id: string;
   number: number;
   title: string;
   url: string;
@@ -56,6 +57,7 @@ query Fleet($q: String!, $first: Int!, $after: String) {
     pageInfo { hasNextPage endCursor }
     nodes {
       ... on PullRequest {
+        id
         number
         title
         url
@@ -152,6 +154,46 @@ export async function fetchFleet(opts: {
   } while (after);
 
   return { pullRequests, issueCount, rateLimit, truncated };
+}
+
+// --- Write actions ----------------------------------------------------------
+// GraphQL mutations keyed by the PR's node id. Require a token with write
+// access (e.g. `repo` scope, or a fine-grained PAT with Pull requests: write).
+const MUTATIONS = {
+  approve:
+    "mutation($id:ID!){addPullRequestReview(input:{pullRequestId:$id,event:APPROVE}){clientMutationId}}",
+  merge:
+    "mutation($id:ID!){mergePullRequest(input:{pullRequestId:$id}){clientMutationId}}",
+  close:
+    "mutation($id:ID!){closePullRequest(input:{pullRequestId:$id}){clientMutationId}}",
+} as const;
+
+export type PrAction = keyof typeof MUTATIONS;
+
+export async function mutatePR(
+  action: PrAction,
+  opts: { endpoint: string; token: string; id: string },
+): Promise<void> {
+  const res = await fetch(opts.endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: MUTATIONS[action],
+      variables: { id: opts.id },
+    }),
+  });
+  if (res.status === 401)
+    throw new GitHubError("Unauthorized — token lacks write access (401).");
+  if (!res.ok)
+    throw new GitHubError(`Request failed: ${res.status} ${res.statusText}`);
+  const body = await res.json();
+  if (body.errors?.length)
+    throw new GitHubError(
+      body.errors.map((e: { message: string }) => e.message).join("; "),
+    );
 }
 
 // Derive the GraphQL endpoint from a host. github.com → api.github.com/graphql;

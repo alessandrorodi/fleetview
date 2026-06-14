@@ -3,7 +3,9 @@ import {
   fetchFleet,
   endpointForHost,
   GitHubError,
+  mutatePR,
   type FleetResult,
+  type PrAction,
   type PullRequest,
 } from "./lib/github";
 import {
@@ -75,6 +77,8 @@ export function App() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [demo, setDemo] = useState(false);
   const [cursor, setCursor] = useState(-1);
+  const [acting, setActing] = useState(false);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   const loadDemo = useCallback(() => {
     localStorage.setItem(DEMO_KEY, "1");
@@ -151,6 +155,47 @@ export function App() {
       next.has(repo) ? next.delete(repo) : next.add(repo);
       return next;
     });
+
+  const runBulk = async (action: PrAction) => {
+    const targets = prs.filter((pr) => selected.has(prKey(pr)));
+    if (!targets.length) return;
+    if (demo) {
+      setActionMsg("Demo mode — actions are disabled. Load real data to use these.");
+      return;
+    }
+    const verb = action === "approve" ? "Approve" : action === "merge" ? "Merge" : "Close";
+    if (
+      (action === "merge" || action === "close") &&
+      !window.confirm(`${verb} ${targets.length} pull request(s)? This acts on GitHub.`)
+    )
+      return;
+
+    setActing(true);
+    setActionMsg(null);
+    let ok = 0;
+    const fails: string[] = [];
+    for (const pr of targets) {
+      try {
+        await mutatePR(action, {
+          endpoint: endpointForHost(settings.host),
+          token: settings.token,
+          id: pr.id,
+        });
+        ok++;
+      } catch (e) {
+        fails.push(`#${pr.number}: ${e instanceof GitHubError ? e.message : String(e)}`);
+      }
+    }
+    setActing(false);
+    setActionMsg(
+      `${verb}: ${ok} succeeded` +
+        (fails.length ? ` · ${fails.length} failed — ${fails[0]}` : ""),
+    );
+    if (ok) {
+      setSelected(new Set());
+      void refresh(settings);
+    }
+  };
 
   // Keyboard navigation over the flattened visible (expanded) list. The focus
   // cursor stays hidden (-1) until the first j/k press.
@@ -407,9 +452,18 @@ export function App() {
       {selected.size > 0 && (
         <div className="cmdbar">
           <strong>{selected.size}</strong> selected
-          <span className="muted">· bulk approve / merge / close (needs a write-scoped token)</span>
+          {actionMsg && <span className="muted">· {actionMsg}</span>}
           <div className="grow" />
-          <button className="ghost" onClick={() => setSelected(new Set())}>
+          <button className="ghost" disabled={acting} onClick={() => runBulk("approve")}>
+            Approve
+          </button>
+          <button className="ghost act-merge" disabled={acting} onClick={() => runBulk("merge")}>
+            Merge
+          </button>
+          <button className="ghost act-close" disabled={acting} onClick={() => runBulk("close")}>
+            Close
+          </button>
+          <button className="ghost" disabled={acting} onClick={() => setSelected(new Set())}>
             Clear
           </button>
         </div>
