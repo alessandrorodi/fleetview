@@ -22,6 +22,13 @@ if (mode === "bulk") {
   for (const b of boxes.slice(0, 2)) await b.click();
   await page.waitForTimeout(300);
   await page.screenshot({ path: out });
+} else if (mode === "modal") {
+  const boxes = await page.$$(".row input[type=checkbox]");
+  for (const b of boxes.slice(0, 3)) await b.click();
+  await page.waitForTimeout(150);
+  await page.click(".cmd-close");
+  await page.waitForTimeout(700); // mid-run: one done, one running, one pending
+  await page.screenshot({ path: out });
 } else {
   const el = await page.$(".app");
   await el.screenshot({ path: out });

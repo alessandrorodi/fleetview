@@ -41,6 +41,25 @@ const REVIEW_LABEL: Record<ReviewStatus, string> = {
   review: "Waiting for review",
 };
 
+const ACTION_LABEL: Record<PrAction, { verb: string; ing: string; done: string }> = {
+  approve: { verb: "Approve", ing: "Approving", done: "Approved" },
+  merge: { verb: "Merge", ing: "Merging", done: "Merged" },
+  close: { verb: "Close", ing: "Closing", done: "Closed" },
+};
+
+type BulkStatus = "pending" | "running" | "done" | "error";
+interface BulkRun {
+  action: PrAction;
+  finished: boolean;
+  items: Array<{
+    key: string;
+    ref: string;
+    title: string;
+    status: BulkStatus;
+    error?: string;
+  }>;
+}
+
 interface Settings {
   host: string;
   token: string;
@@ -84,6 +103,7 @@ export function App() {
   const [acting, setActing] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [loadedToReview, setLoadedToReview] = useState(false);
+  const [bulkRun, setBulkRun] = useState<BulkRun | null>(null);
 
   const loadDemo = useCallback(() => {
     localStorage.setItem(DEMO_KEY, "1");
@@ -159,13 +179,17 @@ export function App() {
   // Demo has no second fetch, so approximate "To review" as others' PRs.
   const isOthersPR = (pr: PullRequest) =>
     !!pr.author?.login && (!viewer || pr.author.login !== viewer);
+  // "Needs review" = your *own* PRs still awaiting review — kept distinct from
+  // the "To review" tab (others' PRs awaiting your review) so they don't overlap.
+  const needsReview = (pr: PullRequest) =>
+    reviewStatus(pr) === "review" && (!viewer || pr.author?.login === viewer);
 
   const counts = useMemo<Record<Filter, number | undefined>>(() => {
     if (demo) {
       let review = 0,
         toreview = 0;
       for (const pr of prs) {
-        if (reviewStatus(pr) === "review") review++;
+        if (needsReview(pr)) review++;
         if (isOthersPR(pr)) toreview++;
       }
       return { all: prs.length, review, toreview };
@@ -174,7 +198,7 @@ export function App() {
     if (loadedToReview)
       return { all: undefined, review: undefined, toreview: prs.length };
     let review = 0;
-    for (const pr of prs) if (reviewStatus(pr) === "review") review++;
+    for (const pr of prs) if (needsReview(pr)) review++;
     return { all: prs.length, review, toreview: undefined };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prs, demo, loadedToReview, viewer]);
@@ -182,7 +206,7 @@ export function App() {
   const visible = useMemo(
     () =>
       prs.filter((pr) => {
-        if (filter === "review") return reviewStatus(pr) === "review";
+        if (filter === "review") return needsReview(pr);
         if (filter === "toreview") return demo ? isOthersPR(pr) : true;
         return true;
       }),
@@ -212,15 +236,25 @@ export function App() {
       return next;
     });
 
+  const setItemStatus = (i: number, status: BulkStatus, error?: string) =>
+    setBulkRun((b) =>
+      b
+        ? {
+            ...b,
+            items: b.items.map((it, idx) =>
+              idx === i ? { ...it, status, error } : it,
+            ),
+          }
+        : b,
+    );
+
   const runBulk = async (action: PrAction) => {
     const targets = prs.filter((pr) => selected.has(prKey(pr)));
     if (!targets.length) return;
-    if (demo) {
-      setActionMsg("Demo mode — actions are disabled. Load real data to use these.");
-      return;
-    }
-    const verb = action === "approve" ? "Approve" : action === "merge" ? "Merge" : "Close";
+    const { verb } = ACTION_LABEL[action];
+    // Real runs confirm first (they write to GitHub); demo is simulated.
     if (
+      !demo &&
       (action === "merge" || action === "close") &&
       !window.confirm(`${verb} ${targets.length} pull request(s)? This acts on GitHub.`)
     )
@@ -228,29 +262,51 @@ export function App() {
 
     setActing(true);
     setActionMsg(null);
+    setBulkRun({
+      action,
+      finished: false,
+      items: targets.map((pr) => ({
+        key: prKey(pr),
+        ref: `${pr.repository.nameWithOwner}#${pr.number}`,
+        title: pr.title,
+        status: "pending" as BulkStatus,
+      })),
+    });
+
     let ok = 0;
-    const fails: string[] = [];
-    for (const pr of targets) {
-      try {
-        await mutatePR(action, {
-          endpoint: endpointForHost(settings.host),
-          token: settings.token,
-          id: pr.id,
-        });
+    for (let i = 0; i < targets.length; i++) {
+      setItemStatus(i, "running");
+      if (demo) {
+        await new Promise((r) => setTimeout(r, 420)); // simulate — no GitHub call
         ok++;
-      } catch (e) {
-        fails.push(`#${pr.number}: ${e instanceof GitHubError ? e.message : String(e)}`);
+        setItemStatus(i, "done");
+      } else {
+        try {
+          await mutatePR(action, {
+            endpoint: endpointForHost(settings.host),
+            token: settings.token,
+            id: targets[i].id,
+          });
+          ok++;
+          setItemStatus(i, "done");
+        } catch (e) {
+          setItemStatus(i, "error", e instanceof GitHubError ? e.message : String(e));
+        }
       }
     }
+
+    setBulkRun((b) => (b ? { ...b, finished: true } : b));
     setActing(false);
-    setActionMsg(
-      `${verb}: ${ok} succeeded` +
-        (fails.length ? ` · ${fails.length} failed — ${fails[0]}` : ""),
+    setSelected(new Set());
+    // Let the result land, then refresh the list and close the modal.
+    window.setTimeout(
+      () => {
+        setBulkRun(null);
+        if (demo) loadDemo();
+        else void refresh(settings, queryFor(filter, settings), filter === "toreview");
+      },
+      ok === targets.length ? 1300 : 2600,
     );
-    if (ok) {
-      setSelected(new Set());
-      void refresh(settings, queryFor(filter, settings), filter === "toreview");
-    }
   };
 
   // Keyboard navigation over the flattened visible (expanded) list. The focus
@@ -568,6 +624,53 @@ export function App() {
           </button>
         </div>
       )}
+
+      {bulkRun && <BulkModal run={bulkRun} />}
+    </div>
+  );
+}
+
+function BulkModal({ run }: { run: BulkRun }) {
+  const ok = run.items.filter((i) => i.status === "done").length;
+  const fail = run.items.filter((i) => i.status === "error").length;
+  const label = ACTION_LABEL[run.action];
+  const firstErr = run.items.find((i) => i.status === "error")?.error;
+  return (
+    <div className="modal-overlay">
+      <div className="modal" role="dialog" aria-modal="true">
+        <div className="modal-head">
+          {run.finished
+            ? `${label.done} ${ok}${fail ? ` · ${fail} failed` : ""}`
+            : `${label.ing} ${run.items.length} pull request${
+                run.items.length > 1 ? "s" : ""
+              }…`}
+        </div>
+        <ul className="bulk-list">
+          {run.items.map((it) => (
+            <li className={`bulk-item ${it.status}`} key={it.key} title={it.error}>
+              <span className={`bulk-status ${it.status}`}>
+                {it.status === "running" ? (
+                  <span className="spinner" />
+                ) : it.status === "done" ? (
+                  <CheckIcon size={14} />
+                ) : it.status === "error" ? (
+                  <XMark size={14} />
+                ) : (
+                  <span className="dot-hollow" />
+                )}
+              </span>
+              <span className="bi-title">{it.title}</span>
+              <span className="bi-ref">{it.ref}</span>
+            </li>
+          ))}
+        </ul>
+        {run.finished && (
+          <div className="modal-foot">
+            <span className="spinner" /> Refreshing…
+          </div>
+        )}
+        {run.finished && firstErr && <div className="modal-err">{firstErr}</div>}
+      </div>
     </div>
   );
 }
