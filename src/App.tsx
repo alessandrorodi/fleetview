@@ -26,11 +26,11 @@ import { BRAND_PATHS, BrandMark } from "./lib/brand";
 type Filter = "all" | "review";
 
 const CI_LABEL: Record<CiStatus, string> = {
-  success: "Passing",
-  failure: "Failing",
-  pending: "Running",
-  queued: "Queued",
-  none: "No checks",
+  success: "CI: passing",
+  failure: "CI: failing",
+  pending: "CI: running",
+  queued: "CI: queued",
+  none: "CI: none",
 };
 
 const REVIEW_LABEL: Record<ReviewStatus, string> = {

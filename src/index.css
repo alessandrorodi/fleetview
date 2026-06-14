@@ -317,7 +317,7 @@ button:focus-visible {
 /* ---- row ---- */
 .row {
   display: grid;
-  grid-template-columns: 16px 26px minmax(0, 1fr) 112px 150px 84px 36px;
+  grid-template-columns: 16px 26px minmax(0, 1fr) 124px 150px 84px 36px;
   align-items: center;
   gap: 13px;
   padding: 11px 12px;
