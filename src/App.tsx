@@ -15,7 +15,6 @@ import {
   groupByRepo,
   relativeAge,
   reviewStatus,
-  type Agent,
   type CiStatus,
   type ReviewStatus,
 } from "./lib/derive";
@@ -391,7 +390,6 @@ export function App() {
                         <Avatar
                           url={pr.author?.avatarUrl}
                           login={pr.author?.login ?? "?"}
-                          agent={agent}
                         />
                         <div className="main">
                           <div className="title-line">
@@ -482,28 +480,14 @@ export function App() {
   );
 }
 
-function Avatar({
-  url,
-  login,
-  agent,
-}: {
-  url?: string;
-  login: string;
-  agent: Agent | null;
-}) {
+// Avatar = the author. The agent (which tool wrote it) is shown separately as
+// the small mark next to the title, so there's no duplication.
+function Avatar({ url, login }: { url?: string; login: string }) {
   const [ok, setOk] = useState(!!url);
-  // Live data: the author's real GitHub avatar (a bot's avatar is its mark).
   if (ok && url)
     return (
       <span className="avatar">
         <img src={url} alt="" onError={() => setOk(false)} />
-      </span>
-    );
-  // No avatar (demo / ghost author): vendored brand mark when we recognise it.
-  if (agent && BRAND_PATHS[agent.label])
-    return (
-      <span className="avatar brand">
-        <BrandMark label={agent.label} color={agent.color} />
       </span>
     );
   return (
