@@ -1,5 +1,7 @@
 # FleetView
 
+**▶ [Live demo](https://alessandrorodi.github.io/fleetview/)** — opens in demo mode, no token or sign-up needed.
+
 A light, **client-side** dashboard for triaging many open GitHub pull requests at once — built for the world where you've got a fleet of AI coding agents each opening their own PR, and GitHub's one-PR-at-a-time UI falls over.
 
 **No backend. No codebase access. Nothing stored server-side.** FleetView is a static frontend that talks straight to GitHub's GraphQL API from your browser. Your token and your PR data never touch a server we run — there isn't one.
