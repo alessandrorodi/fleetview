@@ -403,6 +403,8 @@ button:focus-visible {
   margin-top: 3px;
 }
 .who {
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-2);

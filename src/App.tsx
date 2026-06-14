@@ -357,8 +357,19 @@ export function App() {
                             <span
                               className="who"
                               style={agent ? { color: agent.color } : undefined}
+                              title={agent ? agent.label : pr.author?.login ?? undefined}
                             >
-                              {agent ? agent.label : pr.author?.login ?? "unknown"}
+                              {agent && BRAND_PATHS[agent.label] ? (
+                                <BrandMark
+                                  label={agent.label}
+                                  color={agent.color}
+                                  size={13}
+                                />
+                              ) : agent ? (
+                                agent.label
+                              ) : (
+                                pr.author?.login ?? "unknown"
+                              )}
                             </span>
                             {pr.isDraft && <span className="tk">draft</span>}
                           </div>
