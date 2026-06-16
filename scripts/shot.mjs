@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
 const url = process.argv[2] || "http://localhost:4173/";
-const out = process.argv[3] || "docs/screenshot.png";
+const out = process.argv[3] || "docs/preview.png";
 const mode = process.argv[4] || "board"; // "board" | "bulk"
 
 const browser = await chromium.launch();
